@@ -2,7 +2,6 @@ use std::{
     cell::RefCell,
     collections::{hash_map::Entry, HashMap, HashSet},
 };
-
 use js_sys::{JsString, Object, Reflect};
 use log::*;
 use screeps::{
@@ -42,6 +41,7 @@ enum CreepTarget {
 
 // add wasm_bindgen to any function you would like to expose for call from js
 // to use a reserved name as a function name, use `js_name`:
+#[cfg(feature = "generate-pixel")]
 #[wasm_bindgen(js_name = loop)]
 pub fn game_loop() {
     INIT_LOGGING.call_once(|| {
@@ -61,17 +61,6 @@ pub fn game_loop() {
         }
         assign_new_targets(&mut creep_targets);
     });
-
-    // Check if remaining time is less than 24 hours and activate one CPU if so
-    if let Some(unlocked_time) = game::cpu::unlocked_time() {
-        let day = 24 * 60 * 60 * 1000;
-        let current_time = js_sys::Date::now() as u64;
-        if unlocked_time < current_time + day {
-            game::cpu::unlock().unwrap_or_else(|e| {
-                warn!("Failed to unlock CPU: {:?}", e);
-            });
-        }
-    }
 
     debug!("running towers");
     for tower in game::structures().values() {
@@ -207,6 +196,14 @@ pub fn game_loop() {
                 }
             }
         }
+    }
+
+    if game::cpu::bucket() == 10000 {
+        let _ = game::cpu::generate_pixel();
+    }
+
+    if !game::cpu::unlocked() {
+        let _ = game::cpu::unlock();
     }
 
     info!("done! cpu: {}", game::cpu::get_used())
